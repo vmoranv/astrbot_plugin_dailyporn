@@ -116,8 +116,12 @@ class XFreeHDSource(BaseSource):
                 likes = parse_compact_int(el.get_text(" ", strip=True))
 
         views = None
-        t = soup.get_text(" ", strip=True)
-        views = parse_compact_int(self._extract_first(t, [self._RE_DETAIL_VIEWS]))
+        views_el = soup.select_one(".big-views span.text-white:last-of-type")
+        if views_el:
+            views = parse_compact_int(views_el.get_text(" ", strip=True))
+        if views is None:
+            t = soup.get_text(" ", strip=True)
+            views = parse_compact_int(self._extract_first(t, [self._RE_DETAIL_VIEWS]))
 
         meta: dict[str, object] = {}
         return likes, views, meta
