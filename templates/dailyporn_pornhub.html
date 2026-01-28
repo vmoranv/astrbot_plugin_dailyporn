@@ -95,6 +95,13 @@
       font-size: 13px;
       font-weight: 700;
     }
+    .badges{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      flex-wrap:wrap;
+      justify-content:flex-end;
+    }
     .badge .dot{
       width: 9px; height: 9px;
       border-radius: 50%;
@@ -236,32 +243,39 @@
     <div class="header">
       <div class="brand">
         <h1><span class="a">Daily</span>Porn</h1>
-        <div class="sub">{{ subtitle }}</div>
+        <div class="sub">{{ subtitle|e }}</div>
       </div>
-      <div class="badge"><span class="dot"></span>mosaic {{ mosaic_level }}</div>
+      <div class="badges">
+        {% if title and ("日报" in title) %}
+          <div class="badge"><span class="dot"></span>每日日报</div>
+        {% elif blocks and (blocks|length == 1) and blocks[0].title %}
+          <div class="badge"><span class="dot"></span>{{ ("分区 " ~ blocks[0].title)|e }}</div>
+        {% endif %}
+        <div class="badge"><span class="dot"></span>mosaic {{ mosaic_level }}</div>
+      </div>
     </div>
 
     {% for block in blocks %}
       <div class="block">
-        <div class="block-title">{{ block.title }}</div>
+        <div class="block-title">{{ block.title|e }}</div>
         <div class="grid">
           {% for item in block.items %}
           <div class="card">
             <div class="thumb">
               {% if item.cover %}
-                <img src="{{ item.cover }}" alt="cover" />
+                <img src="{{ item.cover|e }}" alt="cover" />
               {% else %}
                 <div class="ph">No Cover</div>
               {% endif %}
             </div>
             <div class="meta">
               <div class="row">
-                <div class="src"><span class="tag">{{ item.source }}</span></div>
+                <div class="src"><span class="tag">{{ item.source|e }}</span></div>
                 <div class="score">star {{ item.stars if item.stars is not none else '-' }} · views {{ item.views if item.views is not none else '-' }}</div>
               </div>
-              <p class="title">{{ item.title }}</p>
-              {% if item.duration %}<div class="row">时长 {{ item.duration }}</div>{% endif %}
-              <div class="link">{{ item.url }}</div>
+              <p class="title">{{ item.title|e }}</p>
+              {% if item.duration %}<div class="row">时长 {{ item.duration|e }}</div>{% endif %}
+              <div class="link">{{ item.url|e }}</div>
             </div>
           </div>
           {% endfor %}
@@ -271,9 +285,8 @@
 
     <div class="footer">
       <div>DailyPorn · HTML Render</div>
-      <div>{{ title }}</div>
+      <div>{{ title|e }}</div>
     </div>
   </div>
 </body>
 </html>
-

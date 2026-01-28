@@ -49,8 +49,8 @@ class ReportService:
 
             for session in targets:
                 await self._send_daily(session, recos, reason=event.reason)
-        except Exception as e:
-            logger.error(f"[dailyporn] report failed: {e}")
+        except Exception:
+            logger.exception("[dailyporn] report failed")
 
     async def _send_daily(self, session: str, recos: dict, *, reason: str) -> None:
         if self._cfg.delivery_mode == "html_image" and self._renderer is not None:

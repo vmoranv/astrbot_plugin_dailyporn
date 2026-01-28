@@ -57,14 +57,6 @@ class SpankBangSource(BaseSource):
                 )
             except Exception as e:
                 last_err = e
-                if isinstance(e, HttpStatusError) and e.status == 403:
-                    try:
-                        return await self._http.get_text_via_jina(
-                            url, proxy=proxy, headers=self._HEADERS
-                        )
-                    except Exception as je:
-                        last_err = je
-                        continue
                 continue
         if last_err:
             if isinstance(last_err, HttpStatusError) and last_err.status == 403:

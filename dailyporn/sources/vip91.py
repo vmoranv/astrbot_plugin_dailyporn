@@ -43,19 +43,11 @@ class Vip91Source(BaseSource):
             )
         except Exception as e:
             if isinstance(e, HttpStatusError) and e.status == 403:
-                try:
-                    html = await self._http.get_text_via_jina(
-                        self._HOT_URL, proxy=proxy, headers=self._HEADERS
-                    )
-                except Exception as je:
-                    if isinstance(je, HttpStatusError) and je.status == 403:
-                        raise SourceBlockedError(
-                            "HTTP 403 (Cloudflare/anti-bot). "
-                            "Provide a working proxy in plugin config or disable this source."
-                        ) from je
-                    raise
-            else:
-                raise
+                raise SourceBlockedError(
+                    "HTTP 403 (Cloudflare/anti-bot). "
+                    "Provide a working proxy in plugin config or disable this source."
+                ) from e
+            raise
         soup = BeautifulSoup(html, "html.parser")
 
         items: list[HotItem] = []

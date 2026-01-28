@@ -32,5 +32,5 @@ class EventBus:
             task.result()
         except asyncio.CancelledError:
             return
-        except Exception as e:
-            logger.error(f"[dailyporn] event handler error: {e}")
+        except Exception:
+            logger.exception("[dailyporn] event handler error")

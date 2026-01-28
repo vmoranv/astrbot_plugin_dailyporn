@@ -15,9 +15,7 @@ from typing import Optional
 from bs4 import BeautifulSoup
 from PIL import Image
 
-from pathlib import Path as _Path
-
-sys.path.insert(0, str(_Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from dailyporn.config import DailyPornConfig
 from dailyporn.services.http import HttpService
@@ -70,15 +68,11 @@ _RE_VIEWS_TEXT = re.compile(r"(\d[\d,\.]*[KMB]?)\s*(?:views?|观看|播放)", re
 _RE_DATA_LIKES = re.compile(r'data-likes=["\']?(\d+)["\']?', re.IGNORECASE)
 _RE_LIKECOUNT = re.compile(r'"(?:likeCount|likes)"\s*:\s*"?(\d+)"?', re.IGNORECASE)
 _RE_LIKES_TEXT = re.compile(r"(\d[\d,\.]*[KMB]?)\s*(?:likes?|赞)", re.IGNORECASE)
-_RE_VOTES_TEXT = re.compile(
-    r"(\\d[\\d,\\.]*[KMB]?)\\s*(?:votes?|ratings?)", re.IGNORECASE
-)
+_RE_VOTES_TEXT = re.compile(r"(\d[\d,\.]*[KMB]?)\s*(?:votes?|ratings?)", re.IGNORECASE)
 _RE_FAVS_TEXT = re.compile(
-    r"(\\d[\\d,\\.]*[KMB]?)\\s*(?:favorites?|favourites?)", re.IGNORECASE
+    r"(\d[\d,\.]*[KMB]?)\s*(?:favorites?|favourites?)", re.IGNORECASE
 )
-_RE_PLAYS_TEXT = re.compile(
-    r"(\\d[\\d,\\.]*[KMB]?)\\s*(?:plays?|watches?)", re.IGNORECASE
-)
+_RE_PLAYS_TEXT = re.compile(r"(\d[\d,\.]*[KMB]?)\s*(?:plays?|watches?)", re.IGNORECASE)
 
 
 def _extract_first(patterns: list[re.Pattern[str]], text: str) -> str:
@@ -394,16 +388,6 @@ async def amain() -> int:
 
         results = await asyncio.gather(*tasks, return_exceptions=False)
 
-        def _sanitize(obj):
-            if isinstance(obj, list):
-                return [_sanitize(x) for x in obj]
-            if isinstance(obj, dict):
-                out = {}
-                for k, v in obj.items():
-                    out[k] = "" if v is None else _sanitize(v)
-                return out
-            return obj
-
         report = {
             "generated_at": datetime.now().isoformat(timespec="seconds"),
             "args": vars(args),
@@ -413,7 +397,7 @@ async def amain() -> int:
                 "skipped": sum(1 for r in results if r.skipped),
                 "failed": sum(1 for r in results if not r.ok),
             },
-            "results": _sanitize([asdict(r) for r in results]),
+            "results": [asdict(r) for r in results],
         }
 
         (out_dir / "report.json").write_text(

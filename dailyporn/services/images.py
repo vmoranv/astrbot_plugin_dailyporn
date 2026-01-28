@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import warnings
 from io import BytesIO
 from typing import Optional
 
 from PIL import Image
 
 from astrbot.api import logger
-from astrbot.core.utils.astrbot_path import get_astrbot_data_path
+from astrbot.api.star import StarTools
 
 from ..config import DailyPornConfig
 from .http import HttpService
@@ -18,9 +19,7 @@ class ImageService:
     def __init__(self, *, plugin_name: str, cfg: DailyPornConfig, http: HttpService):
         self._cfg = cfg
         self._http = http
-        self._cache_dir = (
-            get_astrbot_data_path() / "plugin_data" / plugin_name / "cache" / "covers"
-        )
+        self._cache_dir = StarTools.get_data_dir(plugin_name) / "cache" / "covers"
 
     async def get_cover_path(self, url: str) -> Optional[str]:
         url = (url or "").strip()
@@ -43,18 +42,22 @@ class ImageService:
             try:
                 await asyncio.to_thread(out_path.write_bytes, data)
                 return str(out_path)
-            except Exception as e:
-                logger.warning(f"[dailyporn] cover save failed: {e}")
+            except Exception:
+                logger.exception("[dailyporn] cover save failed")
                 return None
 
         try:
-            img = Image.open(BytesIO(data))
-            img = img.convert("RGB")
+            with warnings.catch_warnings():
+                warnings.simplefilter("error", Image.DecompressionBombWarning)
+                Image.MAX_IMAGE_PIXELS = 30_000_000
+                img = Image.open(BytesIO(data))
+                img.load()
+                img = img.convert("RGB")
             pixelated = self._pixelate(img, mosaic_level=mosaic_level)
             await asyncio.to_thread(pixelated.save, out_path, "PNG", optimize=True)
             return str(out_path)
-        except Exception as e:
-            logger.warning(f"[dailyporn] cover process failed: {e}")
+        except Exception:
+            logger.exception("[dailyporn] cover process failed")
             return None
 
     @staticmethod

@@ -1,6 +1,6 @@
 name: astrbot_plugin_dailyporn
 display_name: DailyPorn 日报推荐
-desc: 定时触发多源热榜（3D/2.5D/真人），支持群聊开关、手动触发、分区查询与封面打码。
+desc: 每日簧片热榜。
 version: v0.1.1
 author: vmoranv
 repo: ""

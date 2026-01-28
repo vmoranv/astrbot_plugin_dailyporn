@@ -1,18 +1,20 @@
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
 import astrbot.api.message_components as Comp
 from astrbot.api import AstrBotConfig
 from astrbot.api.event import AstrMessageEvent, filter
-from astrbot.api.star import Context, Star, register
+from astrbot.api.star import Context, Star
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from dailyporn.app import DailyPornApp
 from dailyporn.events import DailyReportRequested
 from dailyporn.sections import SECTIONS, normalize_section, section_display
 
 
-@register(
-    "astrbot_plugin_dailyporn", "vmoranv", "多源热榜日报推荐（3D/2.5D/真人）", "0.1.1"
-)
 class DailyPornPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)

@@ -4,12 +4,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Awaitable, Callable, Optional
 
-try:
-    from astrbot.api import logger  # type: ignore
-except Exception:  # pragma: no cover
-    import logging
-
-    logger = logging.getLogger("dailyporn.render")
+from astrbot.api import logger
 
 from ..config import DailyPornConfig
 from ..models import HotItem

@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Dict
 
 from astrbot.api import logger
-from astrbot.core.utils.astrbot_path import get_astrbot_data_path
+from astrbot.api.star import StarTools
 
 
 @dataclass(frozen=True)
@@ -18,7 +18,7 @@ class Subscription:
 class SubscriptionRepository:
     def __init__(self, plugin_name: str):
         self._plugin_name = plugin_name
-        self._data_dir = get_astrbot_data_path() / "plugin_data" / plugin_name
+        self._data_dir = StarTools.get_data_dir(plugin_name)
         self._file_path = self._data_dir / "subscriptions.json"
 
     async def set_enabled(self, session: str, enabled: bool) -> None:
@@ -50,8 +50,8 @@ class SubscriptionRepository:
                     obj = json.load(f)
                 if isinstance(obj, dict):
                     return {str(k): bool(v) for k, v in obj.items()}
-            except Exception as e:
-                logger.warning(f"[dailyporn] subscriptions read failed: {e}")
+            except Exception:
+                logger.exception("[dailyporn] subscriptions read failed")
             return {}
 
         return await asyncio.to_thread(_sync_read)
@@ -62,7 +62,7 @@ class SubscriptionRepository:
                 self._data_dir.mkdir(parents=True, exist_ok=True)
                 with self._file_path.open("w", encoding="utf-8") as f:
                     json.dump(data, f, ensure_ascii=False, indent=2)
-            except Exception as e:
-                logger.warning(f"[dailyporn] subscriptions write failed: {e}")
+            except Exception:
+                logger.exception("[dailyporn] subscriptions write failed")
 
         await asyncio.to_thread(_sync_write)
