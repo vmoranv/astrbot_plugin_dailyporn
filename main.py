@@ -1,24 +1,136 @@
-from astrbot.api.event import filter, AstrMessageEvent, MessageEventResult
-from astrbot.api.star import Context, Star, register
-from astrbot.api import logger
+from __future__ import annotations
 
-@register("helloworld", "YourName", "一个简单的 Hello World 插件", "1.0.0")
-class MyPlugin(Star):
-    def __init__(self, context: Context):
+import astrbot.api.message_components as Comp
+from astrbot.api import AstrBotConfig
+from astrbot.api.event import AstrMessageEvent, filter
+from astrbot.api.star import Context, Star, register
+
+from dailyporn.app import DailyPornApp
+from dailyporn.events import DailyReportRequested
+from dailyporn.sections import SECTIONS, normalize_section, section_display
+
+
+@register(
+    "astrbot_plugin_dailyporn", "vmoranv", "多源热榜日报推荐（3D/2.5D/真人）", "0.1.1"
+)
+class DailyPornPlugin(Star):
+    def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
+        self.config = config
+        self.app = DailyPornApp(
+            context=context,
+            raw_config=dict(config),
+            plugin_name="astrbot_plugin_dailyporn",
+            html_render=self.html_render,
+        )
 
     async def initialize(self):
-        """可选择实现异步的插件初始化方法，当实例化该插件类之后会自动调用该方法。"""
+        await self.app.start()
 
-    # 注册指令的装饰器。指令名为 helloworld。注册成功后，发送 `/helloworld` 就会触发这个指令，并回复 `你好, {user_name}!`
-    @filter.command("helloworld")
-    async def helloworld(self, event: AstrMessageEvent):
-        """这是一个 hello world 指令""" # 这是 handler 的描述，将会被解析方便用户了解插件内容。建议填写。
-        user_name = event.get_sender_name()
-        message_str = event.message_str # 用户发的纯文本消息字符串
-        message_chain = event.get_messages() # 用户所发的消息的消息链 # from astrbot.api.message_components import *
-        logger.info(message_chain)
-        yield event.plain_result(f"Hello, {user_name}, 你发了 {message_str}!") # 发送一条纯文本消息
+    @filter.command("dailyporn")
+    async def dailyporn(self, event: AstrMessageEvent, arg1: str = ""):
+        """日报：/dailyporn on|off|test|<分区>"""
+        session = event.unified_msg_origin
+        sub = (arg1 or "").strip()
+        sub_lower = sub.lower()
+
+        if sub_lower == "on":
+            await self.app.subscriptions.set_enabled(session, True)
+            yield event.plain_result("已在当前群聊开启 DailyPorn 日报。")
+            return
+
+        if sub_lower == "off":
+            await self.app.subscriptions.set_enabled(session, False)
+            yield event.plain_result("已在当前群聊关闭 DailyPorn 日报。")
+            return
+
+        if sub_lower == "test":
+            yield event.plain_result("正在生成日报…")
+            self.app.bus.publish(
+                DailyReportRequested(reason="manual", target_sessions=[session])
+            )
+            return
+
+        if not sub or sub_lower in {"help", "h", "?"}:
+            yield event.plain_result(self._help_text())
+            return
+
+        section = normalize_section(sub)
+        if section == "all":
+            for sec in SECTIONS:
+                async for r in self._send_section(event, sec.key):
+                    yield r
+            return
+
+        if not section:
+            yield event.plain_result(self._help_text())
+            return
+
+        async for r in self._send_section(event, section):
+            yield r
+
+    async def _send_section(self, event: AstrMessageEvent, section: str):
+        items = await self.app.recommendations.get_section_items(
+            section, per_source_limit=1
+        )
+        if not items:
+            yield event.plain_result(
+                f"【{section_display(section)}】暂无数据（可能该分区未启用任何源）。"
+            )
+            return
+
+        if self.app.cfg.delivery_mode == "html_image":
+            image_path = await self.app.renderer.render_section(section, items)
+            if image_path:
+                yield event.chain_result([Comp.Image.fromFileSystem(image_path)])
+                return
+
+        yield event.plain_result(
+            f"【{section_display(section)} 热门】共 {len(items)} 个源"
+        )
+
+        for item in items:
+            stars = item.stars if item.stars is not None else "-"
+            views = item.views if item.views is not None else "-"
+            duration = (
+                item.meta.get("duration", "") if isinstance(item.meta, dict) else ""
+            )
+            duration_text = f"\n时长: {duration}" if duration else ""
+
+            text = (
+                f"[{item.source}] {item.title}{duration_text}\n"
+                f"star: {stars}  views: {views}\n"
+                f"{item.url}"
+            )
+
+            chain = []
+            cover_path = (
+                await self.app.images.get_cover_path(item.cover_url)
+                if item.cover_url
+                else None
+            )
+            if cover_path:
+                chain.append(Comp.Image.fromFileSystem(cover_path))
+            chain.append(Comp.Plain(text))
+            yield event.chain_result(chain)
+
+    def _help_text(self) -> str:
+        trigger_time = self.app.cfg.trigger_time
+        enabled = [s for s in self.app.sources.list_sources() if s.enabled]
+        enabled_text = (
+            ", ".join(f"{s.display_name}" for s in enabled) if enabled else "（无）"
+        )
+
+        sections_text = " / ".join(f"{s.display}" for s in SECTIONS) + " / all"
+        return (
+            "DailyPorn 使用说明\n"
+            f"- /dailyporn on|off：在当前群聊开关日报\n"
+            f"- /dailyporn test：手动触发一次日报（仅当前群聊）\n"
+            f"- /dailyporn <分区>：返回对应分区不同源最热门封面+信息\n"
+            f"  分区: {sections_text}\n"
+            f"\n当前配置：触发时间 {trigger_time} | 封面打码 {self.app.cfg.mosaic_level}\n"
+            f"已启用源：{enabled_text}"
+        )
 
     async def terminate(self):
-        """可选择实现异步的插件销毁方法，当插件被卸载/停用时会调用。"""
+        await self.app.stop()

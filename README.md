@@ -1,9 +1,21 @@
-# helloworld
+# astrbot_plugin_dailyporn
 
-AstrBot 插件模板
+定时触发多源热榜（3D / 2.5D / 真人）作为推荐，并支持在群聊中开关日报、手动触发与分区查询。
 
-A template plugin for AstrBot plugin feature
+## 指令
 
-# 支持
+- `/dailyporn on`：在当前群聊开启日报
+- `/dailyporn off`：在当前群聊关闭日报
+- `/dailyporn test`：手动触发一次日报（仅当前群聊）
+- `/dailyporn <分区>`：返回对应分区不同源最热门的封面 + 信息（分区：3D / 2.5D / 真人）
 
-- [插件开发文档](https://docs.astrbot.app/dev/star/plugin-new.html)
+## 配置
+
+在管理面板中配置：
+
+- `trigger_time`：日报触发时间（HH:MM）
+- `mosaic_level`：封面打码程度
+- `proxy`：代理地址
+- `delivery_mode`：发送方式（`html_image`/`plain`）
+- `render_template_name`：HTML 渲染模板
+- `sources.*`：是否启用指定源（bool）

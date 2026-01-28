@@ -1,0 +1,183 @@
+{
+  "trigger_time": {
+    "description": "日报触发时间",
+    "type": "string",
+    "hint": "24小时制 HH:MM，例如 09:00。到点后会向已开启日报的群聊推送。",
+    "default": "09:00"
+  },
+  "mosaic_level": {
+    "description": "封面打码程度",
+    "type": "int",
+    "hint": "0=不打码，数值越大越模糊（建议 40-80）",
+    "default": 60,
+    "slider": { "min": 0, "max": 100, "step": 5 }
+  },
+  "proxy": {
+    "description": "代理地址",
+    "type": "string",
+    "hint": "留空不使用代理。示例: http://127.0.0.1:7890 或 socks5://127.0.0.1:1080",
+    "default": ""
+  },
+  "delivery_mode": {
+    "type": "string",
+    "description": "发送方式",
+    "default": "html_image",
+    "options": ["html_image", "plain"],
+    "hint": "html_image=使用 HTML 模板渲染图片发送；plain=纯文本/图片链路（渲染失败时也会自动回退）"
+  },
+  "render_template_name": {
+    "type": "string",
+    "description": "渲染模板",
+    "default": "pornhub",
+    "options": ["pornhub"],
+    "hint": "模板文件位于 templates/dailyporn_pornhub.html"
+  },
+  "render_image_type": {
+    "type": "string",
+    "description": "渲染图片格式",
+    "default": "png",
+    "options": ["png", "jpeg"]
+  },
+  "render_quality": {
+    "type": "int",
+    "description": "JPEG 质量（仅当 render_image_type=jpeg 生效）",
+    "default": 82,
+    "slider": { "min": 10, "max": 100, "step": 2 }
+  },
+  "render_full_page": {
+    "type": "bool",
+    "description": "截图全页（full_page）",
+    "default": true
+  },
+  "render_omit_background": {
+    "type": "bool",
+    "description": "透明背景（omit_background，仅 PNG）",
+    "default": false
+  },
+  "render_timeout_ms": {
+    "type": "int",
+    "description": "渲染超时（毫秒）",
+    "default": 20000
+  },
+  "sources": {
+    "description": "信息源开关（bool）",
+    "type": "object",
+    "items": {
+      "enable_3dporn": {
+        "description": "3DPorn",
+        "type": "bool",
+        "default": true
+      },
+      "enable_3dporndude": {
+        "description": "3DPornDude",
+        "type": "bool",
+        "default": true
+      },
+      "enable_91vip": {
+        "description": "91VIP",
+        "type": "bool",
+        "default": false
+      },
+      "enable_beeg": {
+        "description": "Beeg",
+        "type": "bool",
+        "default": true
+      },
+      "enable_eporner": {
+        "description": "EPorner",
+        "type": "bool",
+        "default": true
+      },
+      "enable_hanime": {
+        "description": "Hanime",
+        "type": "bool",
+        "default": true
+      },
+      "enable_hentaigem": {
+        "description": "HentaiGem",
+        "type": "bool",
+        "default": true
+      },
+      "enable_hqporner": {
+        "description": "HQPorner",
+        "type": "bool",
+        "default": true
+      },
+      "enable_missav": {
+        "description": "MissAV",
+        "type": "bool",
+        "default": true
+      },
+      "enable_mmdhub": {
+        "description": "MMDHub",
+        "type": "bool",
+        "default": true
+      },
+      "enable_noodlemagazine": {
+        "description": "NoodleMagazine",
+        "type": "bool",
+        "default": true
+      },
+      "enable_pornhub": {
+        "description": "PornHub",
+        "type": "bool",
+        "default": true
+      },
+      "enable_porntrex": {
+        "description": "PornTrex",
+        "type": "bool",
+        "default": true
+      },
+      "enable_rule34video": {
+        "description": "Rule34Video",
+        "type": "bool",
+        "default": true
+      },
+      "enable_sexcom": {
+        "description": "Sex.com",
+        "type": "bool",
+        "default": true
+      },
+      "enable_smutba": {
+        "description": "Smutba",
+        "type": "bool",
+        "default": true
+      },
+      "enable_spankbang": {
+        "description": "SpankBang",
+        "type": "bool",
+        "default": false
+      },
+      "enable_xfreehd": {
+        "description": "XFreeHD",
+        "type": "bool",
+        "default": true
+      },
+      "enable_xhamster": {
+        "description": "xHamster",
+        "type": "bool",
+        "default": true
+      },
+      "enable_xnxx": {
+        "description": "XNXX",
+        "type": "bool",
+        "default": true
+      },
+      "enable_xvideos": {
+        "description": "XVideos",
+        "type": "bool",
+        "default": true
+      },
+      "enable_xview": {
+        "description": "XView",
+        "type": "bool",
+        "default": true
+      },
+      "enable_xxxgfporn": {
+        "description": "XXXGFPORN",
+        "type": "bool",
+        "default": true
+      }
+    }
+  }
+}

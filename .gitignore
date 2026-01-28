@@ -48,6 +48,14 @@ coverage.xml
 *.cover
 *.py.cover
 .hypothesis/
+
+# Local dev/reference plugins (must not be published)
+.tmp/
+
+# Serena tooling
+.serena/
+
+# Local testing output
 .pytest_cache/
 cover/
 
