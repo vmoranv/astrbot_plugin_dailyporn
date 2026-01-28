@@ -8,7 +8,7 @@ from bs4 import BeautifulSoup
 
 from ..models import HotItem
 from ..services.http import HttpService
-from ..utils.numbers import parse_compact_int
+from ..utils.numbers import parse_compact_int, parse_percent_int
 from .base import BaseSource
 from .tube_common import parse_tube_list
 
@@ -146,6 +146,7 @@ class XVideosSource(BaseSource):
         for sel in (
             "#v-views strong.mobile-hide",
             "#v-views strong",
+            "#v-views .mobile-hide",
             "#video-views strong",
             ".video-views strong",
             ".video-views .mobile-hide",
@@ -165,20 +166,26 @@ class XVideosSource(BaseSource):
         dislikes = None
         rating_percent = None
         total_votes = None
-        el = soup.select_one(".rating-good-nbr")
+        el = soup.select_one(".rating-good-nbr") or soup.select_one(
+            "[class*='rating-good-nbr']"
+        )
         if el:
             likes = parse_compact_int(el.get_text(" ", strip=True))
-        el = soup.select_one(".rating-bad-nbr")
+        el = soup.select_one(".rating-bad-nbr") or soup.select_one(
+            "[class*='rating-bad-nbr']"
+        )
         if el:
             dislikes = parse_compact_int(el.get_text(" ", strip=True))
 
-        perc_el = soup.select_one(".rate-infos .rating-good-perc")
+        perc_el = soup.select_one(".rate-infos .rating-good-perc") or soup.select_one(
+            "[class*='rating-good-perc']"
+        )
         if perc_el:
-            rating_percent = parse_compact_int(
-                perc_el.get_text(" ", strip=True).replace("%", "")
-            )
+            rating_percent = parse_percent_int(perc_el.get_text(" ", strip=True))
 
-        total_el = soup.select_one(".rate-infos .rating-total-txt")
+        total_el = soup.select_one(".rate-infos .rating-total-txt") or soup.select_one(
+            "[class*='rating-total-txt']"
+        )
         if total_el:
             raw = re.sub(
                 r"[^0-9.,KMBkmb]",
@@ -186,6 +193,18 @@ class XVideosSource(BaseSource):
                 total_el.get_text(" ", strip=True),
             )
             total_votes = parse_compact_int(raw)
+
+        if likes is None or dislikes is None:
+            rate_infos = soup.select_one(".rate-infos")
+            if rate_infos:
+                nums: list[int] = []
+                for tok in re.findall(r"\d[\d,.]*[KMB]?", rate_infos.get_text(" ", strip=True)):
+                    c = parse_compact_int(tok)
+                    if c is not None:
+                        nums.append(c)
+                if len(nums) >= 2:
+                    likes = likes if likes is not None else nums[0]
+                    dislikes = dislikes if dislikes is not None else nums[1]
 
         if likes is None:
             likes = parse_compact_int(
@@ -196,7 +215,7 @@ class XVideosSource(BaseSource):
                 self._extract_first(html, [self._RE_DETAIL_DISLIKES])
             )
         if rating_percent is None:
-            rating_percent = parse_compact_int(
+            rating_percent = parse_percent_int(
                 self._extract_first(html, [self._RE_DETAIL_RATING_PERCENT])
             )
         if total_votes is None:

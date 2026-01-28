@@ -63,7 +63,13 @@ class RecommendationService:
         items = await self.get_section_items(section, per_source_limit=1)
         if not items:
             return None
-        return max(items, key=lambda x: x.score_tuple())
+        ranked = sorted(items, key=lambda x: x.score_tuple(), reverse=True)
+        summary = ", ".join(
+            f"{it.source}(score={it.score_tuple()[0]} stars={it.stars or 0} views={it.views or 0})"
+            for it in ranked
+        )
+        logger.info(f"[dailyporn] rank {section}: {summary}")
+        return ranked[0]
 
     async def get_daily_recommendations(
         self, sections: Iterable[str]

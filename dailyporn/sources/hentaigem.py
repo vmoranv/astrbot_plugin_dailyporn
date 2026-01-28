@@ -34,7 +34,7 @@ class HentaiGemSource(BaseSource):
         if section not in self.sections:
             return []
 
-        url = f"{self._ROOT_URL}/most-popular/"
+        url = f"{self._ROOT_URL}/top-rated/"
         try:
             html = await self._http.get_text(url, proxy=proxy)
         except Exception:
@@ -169,11 +169,15 @@ class HentaiGemSource(BaseSource):
             if "today" in link.get_text(" ", strip=True).lower():
                 today_link = link
                 break
-        if not today_link:
-            return html
-
-        params = (today_link.get("data-parameters") or "").strip()
-        block_id = (today_link.get("data-block-id") or "").strip() or "list_videos_common_videos_list"
+        params = ""
+        block_id = ""
+        if today_link:
+            params = (today_link.get("data-parameters") or "").strip()
+            block_id = (today_link.get("data-block-id") or "").strip()
+        if not params:
+            params = "sort_by:rating_today"
+        if not block_id:
+            block_id = "list_videos_common_videos_list"
         query = self._params_to_query(params)
         ajax_url = f"{base_url}?mode=async&function=get_block&block_id={block_id}"
         if query:
@@ -240,6 +244,10 @@ class HentaiGemSource(BaseSource):
             m = self._RE_DETAIL_VOTES.search(text)
             if m:
                 likes = parse_compact_int(m.group(1))
+        if likes is None:
+            scale = soup.select_one(".rating .scale")
+            if scale and scale.get("data-votes"):
+                likes = parse_compact_int(str(scale.get("data-votes")))
 
         meta: dict[str, object] = {}
         if duration:
