@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
-import os
 import warnings
 from io import BytesIO
 from pathlib import Path
@@ -21,8 +20,7 @@ class ImageService:
     def __init__(self, *, plugin_name: str, cfg: DailyPornConfig, http: HttpService):
         self._cfg = cfg
         self._http = http
-        base_root = get_astrbot_data_path()
-        base_dir = Path(os.path.join(str(base_root), "plugin_data", plugin_name))
+        base_dir = Path(get_astrbot_data_path()) / "plugin_data" / plugin_name
         self._cache_dir = base_dir / "cache" / "covers"
 
     async def get_cover_path(self, url: str) -> Optional[str]:

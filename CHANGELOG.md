@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.1.10 (2026-01-28)
+
+- 修复：封面缓存目录路径拼接，兼容 get_astrbot_data_path 返回 str/Path
+
 ## v0.1.9 (2026-01-28)
 
 - 修复：部分环境 get_astrbot_data_path 返回字符串导致的路径拼接异常
