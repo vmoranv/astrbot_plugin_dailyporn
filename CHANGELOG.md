@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.1.9 (2026-01-28)
+
+- 修复：部分环境 get_astrbot_data_path 返回字符串导致的路径拼接异常
+
 ## v0.1.8 (2026-01-28)
 
 - 修复：XFreeHD 详情页观看数解析（使用页面 big-views 区块）
