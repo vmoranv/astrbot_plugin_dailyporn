@@ -32,6 +32,13 @@
     "options": ["pornhub"],
     "hint": "模板文件位于 templates/dailyporn_pornhub.html"
   },
+  "render_send_mode": {
+    "type": "string",
+    "description": "渲染图片发送方式",
+    "default": "url",
+    "options": ["file", "url", "base64"],
+    "hint": "file=本地文件发送，url=使用渲染接口返回的 URL，base64=以内联 base64 发送"
+  },
   "render_image_type": {
     "type": "string",
     "description": "渲染图片格式",

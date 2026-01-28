@@ -130,9 +130,18 @@ class DailyPornPlugin(Star):
             return
 
         if self.app.cfg.delivery_mode == "html_image":
-            image_path = await self.app.renderer.render_section(section, items)
-            if image_path:
-                yield event.chain_result([Comp.Image.fromFileSystem(image_path)])
+            image_ref = await self.app.renderer.render_section(section, items)
+            if image_ref:
+                send_mode = (self.app.cfg.render_send_mode or "url").strip().lower()
+                if send_mode == "url":
+                    if str(image_ref).startswith(("http://", "https://")):
+                        yield event.chain_result([Comp.Image.fromURL(image_ref)])
+                    else:
+                        yield event.chain_result([Comp.Image.fromFileSystem(image_ref)])
+                elif send_mode == "base64":
+                    yield event.chain_result([Comp.Image.fromBase64(image_ref)])
+                else:
+                    yield event.chain_result([Comp.Image.fromFileSystem(image_ref)])
                 return
 
         yield event.plain_result(

@@ -11,6 +11,7 @@ class DailyPornConfig:
     proxy: str
     delivery_mode: str
     render_template_name: str
+    render_send_mode: str
     render_image_type: str
     render_quality: int
     render_full_page: bool
@@ -38,6 +39,11 @@ class DailyPornConfig:
         render_template_name = str(
             raw.get("render_template_name", "pornhub") or "pornhub"
         ).strip()
+        render_send_mode = (
+            str(raw.get("render_send_mode", "url") or "url").strip().lower()
+        )
+        if render_send_mode not in {"file", "url", "base64"}:
+            render_send_mode = "url"
         render_image_type = (
             str(raw.get("render_image_type", "png") or "png").strip().lower()
         )
@@ -70,6 +76,7 @@ class DailyPornConfig:
             proxy=proxy,
             delivery_mode=delivery_mode,
             render_template_name=render_template_name,
+            render_send_mode=render_send_mode,
             render_image_type=render_image_type,
             render_quality=render_quality,
             render_full_page=render_full_page,

@@ -66,12 +66,21 @@ class ReportService:
             )
             logger.info(f"[dailyporn] render picks: {summary}")
         if self._cfg.delivery_mode == "html_image" and self._renderer is not None:
-            image_path = await self._renderer.render_daily(recos, reason=reason)
-            if image_path:
+            image_ref = await self._renderer.render_daily(recos, reason=reason)
+            if image_ref:
                 try:
-                    await self._context.send_message(
-                        session, MessageChain().file_image(image_path)
-                    )
+                    chain = MessageChain()
+                    send_mode = (self._cfg.render_send_mode or "url").strip().lower()
+                    if send_mode == "url":
+                        if str(image_ref).startswith(("http://", "https://")):
+                            chain.url_image(image_ref)
+                        else:
+                            chain.file_image(image_ref)
+                    elif send_mode == "base64":
+                        chain.base64_image(image_ref)
+                    else:
+                        chain.file_image(image_ref)
+                    await self._context.send_message(session, chain)
                     return
                 except Exception as e:
                     logger.warning(f"[dailyporn] send daily image failed: {e}")

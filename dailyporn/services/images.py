@@ -9,7 +9,7 @@ from typing import Optional
 from PIL import Image
 
 from astrbot.api import logger
-from astrbot.api.star import StarTools
+from astrbot.core.utils.astrbot_path import get_astrbot_data_path
 
 from ..config import DailyPornConfig
 from .http import HttpService
@@ -19,7 +19,8 @@ class ImageService:
     def __init__(self, *, plugin_name: str, cfg: DailyPornConfig, http: HttpService):
         self._cfg = cfg
         self._http = http
-        self._cache_dir = StarTools.get_data_dir(plugin_name) / "cache" / "covers"
+        base_dir = get_astrbot_data_path() / "plugin_data" / plugin_name
+        self._cache_dir = base_dir / "cache" / "covers"
 
     async def get_cover_path(self, url: str) -> Optional[str]:
         url = (url or "").strip()

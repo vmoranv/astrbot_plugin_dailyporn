@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.1.7 (2026-01-28)
+
+- 新增：渲染图片发送方式配置（file/url/base64）
+- 调整：HTML 渲染根据发送方式返回 URL/文件/BASE64
+
+## v0.1.6 (2026-01-28)
+
+- 调整：HTML 渲染图片改为 URL 发送，降低本地上传带宽占用
+- 调整：封面缓存目录迁移至 data/plugin_data/astrbot_plugin_dailyporn/cache/covers
+
 ## v0.1.5 (2026-01-28)
 
 - 优化：日报渲染完成后用 PIL 压缩图片，降低发送体积
