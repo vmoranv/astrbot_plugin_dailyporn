@@ -53,6 +53,12 @@ class DailyPornPlugin(Star):
             )
             return
 
+        # Manual-only sources (no reliable stats; disabled by default; never used in scheduled daily picks).
+        if sub_lower in {"hqporner", "missav"}:
+            async for r in self._send_manual_source(event, sub_lower):
+                yield r
+            return
+
         if not sub or sub_lower in {"help", "h", "?"}:
             yield event.plain_result(self._help_text())
             return
@@ -70,6 +76,48 @@ class DailyPornPlugin(Star):
 
         async for r in self._send_section(event, section):
             yield r
+
+    async def _send_manual_source(self, event: AstrMessageEvent, source_id: str):
+        src = self.app.sources.get_source(source_id)
+        if not src:
+            yield event.plain_result(f"未知信息源：{source_id}")
+            return
+
+        # These sources are treated as "manual-only" and may not expose like/view counters.
+        section = next(iter(getattr(src, "sections", {"real"})), "real")
+        try:
+            items = await src.fetch_hot(section, limit=1, proxy=self.app.cfg.proxy)
+        except Exception as e:
+            yield event.plain_result(f"[{source_id}] 抓取失败：{e}")
+            return
+        if not items:
+            yield event.plain_result(f"[{source_id}] 暂无数据")
+            return
+
+        item = items[0]
+        title = item.title or item.url
+
+        meta = item.meta if isinstance(item.meta, dict) else {}
+        meta_lines = []
+        for k in ("released_at", "duration", "actresses", "tags", "rating", "rating_percent"):
+            v = meta.get(k)
+            if v is None or v == "" or v == []:
+                continue
+            if isinstance(v, list):
+                v = ", ".join(str(x) for x in v[:20])
+            meta_lines.append(f"{k}: {v}")
+        meta_text = "\n" + "\n".join(meta_lines) if meta_lines else ""
+
+        text = f"【{item.source} 最新热榜】\n标题: {title}{meta_text}\n{item.url}"
+
+        chain = []
+        cover_path = (
+            await self.app.images.get_cover_path(item.cover_url) if item.cover_url else None
+        )
+        if cover_path:
+            chain.append(Comp.Image.fromFileSystem(cover_path))
+        chain.append(Comp.Plain(text))
+        yield event.chain_result(chain)
 
     async def _send_section(self, event: AstrMessageEvent, section: str):
         items = await self.app.recommendations.get_section_items(
@@ -129,6 +177,7 @@ class DailyPornPlugin(Star):
             f"- /dailyporn on|off：在当前群聊开关日报\n"
             f"- /dailyporn test：手动触发一次日报（仅当前群聊）\n"
             f"- /dailyporn <分区>：返回对应分区不同源最热门封面+信息\n"
+            f"- /dailyporn hqporner|missav：手动抓取该源最新热榜（默认关闭，不参与定时推荐）\n"
             f"  分区: {sections_text}\n"
             f"\n当前配置：触发时间 {trigger_time} | 封面打码 {self.app.cfg.mosaic_level}\n"
             f"已启用源：{enabled_text}"

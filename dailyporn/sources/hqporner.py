@@ -18,6 +18,7 @@ class HQPornerSource(BaseSource):
         f"{_BASE_URL}/",
         f"{_BASE_URL}/top/",
         f"{_BASE_URL}/most-viewed/",
+        f"{_BASE_URL}/top/week",
     ]
 
     _HEADERS = {
@@ -38,7 +39,7 @@ class HQPornerSource(BaseSource):
             return []
 
         html = await self._fetch_first(proxy)
-        return parse_tube_list(
+        items = parse_tube_list(
             html,
             base_url=self._BASE_URL,
             source_id=self.source_id,
@@ -46,6 +47,22 @@ class HQPornerSource(BaseSource):
             link_patterns=self._LINK_PATTERNS,
             limit=limit,
         )
+        if not items:
+            return items
+
+        return [
+            HotItem(
+                source=it.source,
+                section=it.section,
+                title=it.title,
+                url=it.url,
+                cover_url=it.cover_url,
+                stars=None,
+                views=None,
+                meta=it.meta,
+            )
+            for it in items
+        ]
 
     async def _fetch_first(self, proxy: str) -> str:
         last_err: Exception | None = None

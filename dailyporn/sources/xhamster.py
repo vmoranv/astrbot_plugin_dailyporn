@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import re
 
+from bs4 import BeautifulSoup
+
 from ..models import HotItem
 from ..services.http import HttpService
+from ..utils.numbers import parse_compact_int, parse_percent_int
 from .base import BaseSource
 from .tube_common import parse_tube_list
 
@@ -15,9 +18,7 @@ class XHamsterSource(BaseSource):
 
     _BASE_URL = "https://xhamster.com"
     _HOT_URLS = [
-        f"{_BASE_URL}/trending",
-        f"{_BASE_URL}/most-viewed",
-        f"{_BASE_URL}/",
+        f"{_BASE_URL}/best/daily",
     ]
 
     _HEADERS = {
@@ -30,6 +31,15 @@ class XHamsterSource(BaseSource):
         re.compile(r"^/videos/", re.IGNORECASE),
         re.compile(r"/videos/", re.IGNORECASE),
     ]
+
+    _RE_JSON_VIEWS = re.compile(
+        r'(?i)"(?:views|viewCount|view_count|viewsCount)"\s*:\s*"?(\d[\d,]*)"?'
+    )
+    _RE_TEXT_VIEWS = re.compile(r"(?i)\b(\d[\d,]{3,})\s*views?\b")
+    _RE_LIKE_DISLIKE_PAIR = re.compile(
+        r"\b(\d[\d,\.]*[KMB]?)\s*/\s*(\d[\d,\.]*[KMB]?)\b", re.IGNORECASE
+    )
+    _RE_RATING_PERCENT = re.compile(r"(\d{1,3}(?:\.\d+)?)%")
 
     def __init__(self, http: HttpService):
         self._http = http
@@ -76,7 +86,36 @@ class XHamsterSource(BaseSource):
                 out.append(item)
                 if len(out) >= limit:
                     break
-        return out
+
+        # Enrich with detail-page stats to avoid list-page heuristic mistakes.
+        enriched: list[HotItem] = []
+        for it in out:
+            try:
+                detail = await self._http.get_text(
+                    it.url, proxy=proxy, headers=self._HEADERS
+                )
+            except Exception:
+                enriched.append(it)
+                continue
+
+            likes, views, extra_meta = self._parse_detail_stats(detail)
+            meta = dict(it.meta) if isinstance(it.meta, dict) else {}
+            meta.update(extra_meta)
+
+            enriched.append(
+                HotItem(
+                    source=it.source,
+                    section=it.section,
+                    title=it.title,
+                    url=it.url,
+                    cover_url=it.cover_url,
+                    stars=likes if likes is not None else it.stars,
+                    views=views if views is not None else it.views,
+                    meta=meta,
+                )
+            )
+
+        return enriched
 
     async def _fetch_first(self, proxy: str) -> str:
         last_err: Exception | None = None
@@ -90,3 +129,104 @@ class XHamsterSource(BaseSource):
         if last_err:
             raise last_err
         raise RuntimeError("no url")
+
+    def _parse_detail_stats(
+        self, html: str
+    ) -> tuple[int | None, int | None, dict[str, object]]:
+        soup = BeautifulSoup(html or "", "html.parser")
+        text = soup.get_text(" ", strip=True)
+
+        views = None
+        # DOM hints first
+        for el in soup.select("[aria-label*='views']"):
+            v = parse_compact_int(el.get("aria-label"))
+            if v is not None:
+                views = v
+                break
+        if views is None:
+            eye_icon = soup.select_one("i.xh-icon.eye")
+            if eye_icon:
+                span = eye_icon.find_next_sibling("span")
+                if span:
+                    views = parse_compact_int(span.get_text(" ", strip=True))
+
+        # Schema hints
+        for sel in ("[itemprop='interactionCount']", "[itemprop='userInteractionCount']"):
+            el = soup.select_one(sel)
+            if el:
+                v = parse_compact_int(el.get("content") or el.get_text(" ", strip=True))
+                if v is not None:
+                    views = v
+                    break
+        if views is None:
+            views = parse_compact_int(self._extract_first(html, [self._RE_JSON_VIEWS]))
+        if views is None:
+            views = parse_compact_int(self._extract_first(text, [self._RE_TEXT_VIEWS]))
+
+        likes = None
+        dislikes = None
+        rating_percent = None
+
+        info = soup.select_one(".rb-new__info")
+        if info:
+            pair_text = info.get_text(" ", strip=True)
+            m = self._RE_LIKE_DISLIKE_PAIR.search(pair_text)
+            if m:
+                likes = parse_compact_int(m.group(1))
+                dislikes = parse_compact_int(m.group(2))
+            label = info.get("aria-label") or ""
+            if likes is None or dislikes is None:
+                m = re.search(
+                    r"(\d[\d,\.]*[KMB]?)\s*likes?.*?(\d[\d,\.]*[KMB]?)\s*dislikes?",
+                    label,
+                    re.IGNORECASE,
+                )
+                if m:
+                    likes = parse_compact_int(m.group(1))
+                    dislikes = parse_compact_int(m.group(2))
+            rating_percent = parse_percent_int(label) or rating_percent
+
+        # Many xHamster pages show a pair like "766,027 / 3,312" near the like controls.
+        if likes is None or dislikes is None:
+            for m in self._RE_LIKE_DISLIKE_PAIR.finditer(text or ""):
+                a = parse_compact_int(m.group(1))
+                b = parse_compact_int(m.group(2))
+                if a is None or b is None:
+                    continue
+                if a <= 0:
+                    continue
+                if b < 0:
+                    continue
+                # Plausibility: likes > dislikes and both far smaller than views.
+                if b > a:
+                    continue
+                if views is not None and a > views:
+                    continue
+                likes = a
+                dislikes = b
+                break
+
+        if rating_percent is None:
+            like_icon = soup.select_one("[aria-label*='%'][aria-label*='like']")
+            if like_icon:
+                rating_percent = parse_percent_int(like_icon.get("aria-label"))
+        if rating_percent is None:
+            rating_percent = parse_percent_int(
+                self._extract_first(text, [self._RE_RATING_PERCENT])
+            )
+
+        meta: dict[str, object] = {}
+        if dislikes is not None:
+            meta["dislikes"] = dislikes
+        if rating_percent is not None:
+            meta["rating_percent"] = rating_percent
+
+        return likes, views, meta
+
+    @staticmethod
+    def _extract_first(content: str, patterns: list[re.Pattern[str]]) -> str | None:
+        for p in patterns:
+            m = p.search(content or "")
+            if m:
+                return (m.group(1) or "").strip()
+        return None

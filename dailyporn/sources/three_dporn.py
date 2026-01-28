@@ -8,7 +8,7 @@ from bs4 import BeautifulSoup
 
 from ..models import HotItem
 from ..services.http import HttpService
-from ..utils.numbers import parse_compact_int
+from ..utils.numbers import parse_compact_int, parse_percent_int
 from .base import BaseSource
 from .tube_common import extract_counts, extract_img_url, extract_title
 
@@ -39,6 +39,22 @@ class ThreeDPornSource(BaseSource):
     )
     _RE_POST_ID = re.compile(r'id=["\\\']post-(\\d+)["\\\']', re.IGNORECASE)
     _RE_POSTID_CLASS = re.compile(r"postid-(\\d+)", re.IGNORECASE)
+    _RE_VIDEO_HINT = re.compile(
+        r"(<video\b|\.mp4\b|\.m3u8\b|application/x-mpegurl|player\.vimeo\.com|youtube\.com/embed)",
+        re.IGNORECASE,
+    )
+    _RE_SCHEMA_VIDEOOBJECT = re.compile(
+        r"(schema\.org/videoobject|\"@type\"\s*:\s*\"videoobject\")",
+        re.IGNORECASE,
+    )
+    _RE_DETAIL_VIEWS = re.compile(r"(?i)\b(\d[\d,]*)\s*views?\b")
+    _RE_DETAIL_LIKES = re.compile(
+        r"(?i)(?:data-likes=[\"']?(\d+)[\"']?|aria-label=[\"'][^\"']*like[^\"']*(\d[\d,]*)[^\"']*[\"'])"
+    )
+    _RE_DETAIL_DISLIKES = re.compile(
+        r"(?i)(?:data-dislikes=[\"']?(\d+)[\"']?|aria-label=[\"'][^\"']*dislike[^\"']*(\d[\d,]*)[^\"']*[\"'])"
+    )
+    _RE_DETAIL_RATING_PERCENT = re.compile(r"(\d{1,3}(?:\.\d+)?)%")
 
     def __init__(self, http: HttpService):
         self._http = http
@@ -53,6 +69,8 @@ class ThreeDPornSource(BaseSource):
         items: list[HotItem] = []
         seen: set[str] = set()
 
+        # This site mixes non-video posts (e.g. game pages) in the same listing.
+        # Only keep entries whose detail page looks like a video page.
         for a in soup.select("a.thumb[href]"):
             href = (a.get("href") or "").strip()
             if not href:
@@ -78,6 +96,15 @@ class ThreeDPornSource(BaseSource):
             dur_el = a.find("span", class_="duration")
             if dur_el:
                 duration = (dur_el.get_text(strip=True) or "").strip()
+
+            try:
+                detail_html = await self._http.get_text(
+                    full_url, proxy=proxy, headers=self._HEADERS
+                )
+            except Exception:
+                continue
+            if not self._looks_like_video_page(detail_html):
+                continue
 
             items.append(
                 HotItem(
@@ -119,16 +146,111 @@ class ThreeDPornSource(BaseSource):
             raise last_err
         raise RuntimeError("no url")
 
+    def _looks_like_video_page(self, html: str) -> bool:
+        if not html:
+            return False
+        # 3d-porn.co lists game pages that embed promo videos; require VideoObject
+        # schema to ensure we are selecting actual video entries.
+        if self._RE_SCHEMA_VIDEOOBJECT.search(html):
+            return True
+        return False
+
     async def _enrich_post_stats(self, item: HotItem, *, proxy: str) -> HotItem:
         html = await self._http.get_text(item.url, proxy=proxy, headers=self._HEADERS)
 
+        # Prefer values visible in the real HTML (the ajax payload can be stale or
+        # structured differently across pages).
+        soup = BeautifulSoup(html or "", "html.parser")
+
+        views_from_html = None
+        views_el = soup.select_one("#video-views .views-number") or soup.select_one(
+            ".views-number"
+        )
+        if views_el:
+            views_from_html = parse_compact_int(
+                views_el.get_text(" ", strip=True)
+            )
+        if views_from_html is None:
+            views_from_html = parse_compact_int(
+                self._extract_first(html, [self._RE_DETAIL_VIEWS])
+            )
+
+        likes_from_html = None
+        likes_el = soup.select_one(".likes_count")
+        if likes_el:
+            likes_from_html = parse_compact_int(
+                likes_el.get_text(" ", strip=True)
+            )
+        if likes_from_html is None:
+            m = self._RE_DETAIL_LIKES.search(html or "")
+            if m:
+                likes_from_html = parse_compact_int(m.group(1) or m.group(2))
+
+        dislikes_from_html = None
+        dislikes_el = soup.select_one(".dislikes_count")
+        if dislikes_el:
+            dislikes_from_html = parse_compact_int(
+                dislikes_el.get_text(" ", strip=True)
+            )
+        if dislikes_from_html is None:
+            m = self._RE_DETAIL_DISLIKES.search(html or "")
+            if m:
+                dislikes_from_html = parse_compact_int(m.group(1) or m.group(2))
+
+        rating_percent_from_html = None
+        percent_el = soup.select_one(".rating-result .percentage")
+        if percent_el:
+            rating_percent_from_html = parse_percent_int(
+                percent_el.get_text(" ", strip=True)
+            )
+        if rating_percent_from_html is None:
+            rating_percent_from_html = parse_percent_int(
+                self._extract_first(html, [self._RE_DETAIL_RATING_PERCENT])
+            )
+
+        stars = item.stars
+        if likes_from_html is not None:
+            if stars is None or likes_from_html > stars:
+                stars = likes_from_html
+        elif rating_percent_from_html is not None:
+            if stars is None or rating_percent_from_html > stars:
+                stars = rating_percent_from_html
+
+        v = item.views
+        if v is None and views_from_html is not None:
+            v = views_from_html
+
+        meta = dict(item.meta) if isinstance(item.meta, dict) else {}
+        if dislikes_from_html is not None:
+            meta["dislikes"] = dislikes_from_html
+        if rating_percent_from_html is not None:
+            meta.setdefault("rating_percent", rating_percent_from_html)
+
         m = self._RE_FTT_AJAX.search(html)
         if not m:
-            return item
+            return HotItem(
+                source=item.source,
+                section=item.section,
+                title=item.title,
+                url=item.url,
+                cover_url=item.cover_url,
+                stars=stars,
+                views=v,
+                meta=meta,
+            )
         try:
             ajax_cfg = json.loads(m.group(1))
         except Exception:
-            return item
+            return HotItem(
+                source=item.source,
+                section=item.section,
+                title=item.title,
+                url=item.url,
+                cover_url=item.cover_url,
+                stars=stars,
+                views=v,
+                meta=meta,
+            )
 
         ajax_url = str(ajax_cfg.get("url") or "").strip()
         nonce = str(ajax_cfg.get("nonce") or "").strip()
@@ -137,7 +259,16 @@ class ThreeDPornSource(BaseSource):
         if not ajax_url.startswith("http"):
             ajax_url = urljoin(self._BASE_URL, ajax_url)
         if not ajax_url or not nonce:
-            return item
+            return HotItem(
+                source=item.source,
+                section=item.section,
+                title=item.title,
+                url=item.url,
+                cover_url=item.cover_url,
+                stars=stars,
+                views=v,
+                meta=meta,
+            )
 
         post_id = ""
         pm = self._RE_POST_ID.search(html)
@@ -172,7 +303,16 @@ class ThreeDPornSource(BaseSource):
                 post_id = ""
 
         if not post_id:
-            return item
+            return HotItem(
+                source=item.source,
+                section=item.section,
+                title=item.title,
+                url=item.url,
+                cover_url=item.cover_url,
+                stars=stars,
+                views=v,
+                meta=meta,
+            )
 
         ajax_headers = dict(self._HEADERS)
         ajax_headers["Referer"] = item.url
@@ -189,26 +329,31 @@ class ThreeDPornSource(BaseSource):
         views = data.get("views")
         rating = data.get("rating")
 
-        stars = item.stars
-        if stars is None:
-            for cand in (likes, dislikes, rating):
-                c = parse_compact_int(str(cand)) if cand is not None else None
-                if c is not None:
-                    stars = c
-                    break
+        likes_count = parse_compact_int(str(likes)) if likes is not None else None
+        dislikes_count = (
+            parse_compact_int(str(dislikes)) if dislikes is not None else None
+        )
+        rating_percent = parse_percent_int(str(rating)) if rating is not None else None
 
-        v = item.views
+        # Prefer values extracted from the HTML; fall back to ajax only when
+        # no better signal is available.
+        if stars is None:
+            if likes_count is not None:
+                stars = likes_count
+            elif rating_percent is not None:
+                stars = rating_percent
+
         if v is None:
             c = parse_compact_int(str(views)) if views is not None else None
             if c is not None:
                 v = c
 
-        meta = dict(item.meta) if isinstance(item.meta, dict) else {}
-        dd = parse_compact_int(str(dislikes)) if dislikes is not None else None
-        if dd is not None:
-            meta.setdefault("dislikes", dd)
+        if dislikes_count is not None:
+            meta.setdefault("dislikes", dislikes_count)
         if isinstance(rating, str) and rating:
             meta.setdefault("rating", rating)
+        if rating_percent is not None:
+            meta.setdefault("rating_percent", rating_percent)
 
         return HotItem(
             source=item.source,
@@ -220,3 +365,12 @@ class ThreeDPornSource(BaseSource):
             views=v,
             meta=meta,
         )
+
+
+    @staticmethod
+    def _extract_first(content: str, patterns: list[re.Pattern[str]]) -> str | None:
+        for p in patterns:
+            m = p.search(content or "")
+            if m:
+                return (m.group(1) or "").strip()
+        return None

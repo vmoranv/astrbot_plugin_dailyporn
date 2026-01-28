@@ -16,4 +16,7 @@ class HotItem:
     meta: Mapping[str, Any] = field(default_factory=dict)
 
     def score_tuple(self) -> tuple[int, int]:
-        return (self.stars or 0, self.views or 0)
+        views = int(self.views or 0)
+        stars = int(self.stars or 0)
+        score = views * 7 + stars * 3
+        return (score, views)

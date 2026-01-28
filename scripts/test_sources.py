@@ -17,6 +17,7 @@ from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from dailyporn.sections import SECTIONS
 from dailyporn.config import DailyPornConfig
 from dailyporn.services.http import HttpService
 from dailyporn.sources.base import SourceBlockedError
@@ -26,6 +27,7 @@ from dailyporn.utils.numbers import parse_compact_int
 
 @dataclass
 class ItemCheck:
+    title: str
     title_len: int
     url: str
     cover_url: str
@@ -51,6 +53,16 @@ class SourceCheck:
     items: list[ItemCheck]
 
 
+@dataclass
+class DailyPick:
+    section: str
+    source_id: str
+    title: str
+    url: str
+    stars: Optional[int]
+    views: Optional[int]
+
+
 _RE_OG_DESC = re.compile(
     r'property=["\']og:description["\']\s+content=["\']([^"\']+)["\']', re.IGNORECASE
 )
@@ -73,6 +85,30 @@ _RE_FAVS_TEXT = re.compile(
     r"(\d[\d,\.]*[KMB]?)\s*(?:favorites?|favourites?)", re.IGNORECASE
 )
 _RE_PLAYS_TEXT = re.compile(r"(\d[\d,\.]*[KMB]?)\s*(?:plays?|watches?)", re.IGNORECASE)
+
+
+def _weighted_score(stars: Optional[int], views: Optional[int]) -> tuple[int, int]:
+    v = int(views or 0)
+    s = int(stars or 0)
+    return (v * 7 + s * 3, v)
+
+
+def _apply_manual_period(source, period: str) -> None:
+    if not period:
+        return
+    p = period.strip().lower()
+    if p not in {"week", "month"}:
+        return
+    source_id = getattr(source, "source_id", "")
+    if source_id == "hqporner" and hasattr(source, "_BASE_URL"):
+        base = getattr(source, "_BASE_URL")
+        if base:
+            source._HOT_URLS = [f"{base}/top/{p}"]
+    if source_id == "missav":
+        if p == "week":
+            source._HOT_PATHS = ["/en/weekly-hot"]
+        else:
+            source._HOT_PATHS = ["/en/monthly-hot"]
 
 
 def _extract_first(patterns: list[re.Pattern[str]], text: str) -> str:
@@ -282,6 +318,7 @@ async def _check_one(
 
         checks.append(
             ItemCheck(
+                title=item.title,
                 title_len=len(item.title or ""),
                 url=item.url,
                 cover_url=item.cover_url,
@@ -350,6 +387,17 @@ async def amain() -> int:
         default="",
         help="Write a markdown summary (relative to --out unless absolute)",
     )
+    ap.add_argument(
+        "--daily-check",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Also compute a daily recommendation pick per section (default: true)",
+    )
+    ap.add_argument(
+        "--manual-period",
+        default="",
+        help="Manual-only sources period override: week|month",
+    )
     args = ap.parse_args()
 
     out_dir = Path(args.out)
@@ -365,6 +413,14 @@ async def amain() -> int:
         sources = list(registry.iter_all_sources())
         if args.only_source:
             sources = [s for s in sources if s.source_id == args.only_source]
+        else:
+            sources = [
+                s
+                for s in sources
+                if s.source_id not in SourceRegistry.MANUAL_ONLY_SOURCE_IDS
+            ]
+        for src in sources:
+            _apply_manual_period(src, args.manual_period)
 
         sem = asyncio.Semaphore(max(1, int(args.concurrency)))
         tasks = []
@@ -388,6 +444,32 @@ async def amain() -> int:
 
         results = await asyncio.gather(*tasks, return_exceptions=False)
 
+        daily_picks: list[DailyPick] = []
+        if args.daily_check:
+            # Mimic the plugin's daily recommendation selection, but reuse the
+            # already-fetched source results to avoid extra network traffic.
+            by_section: dict[str, tuple[tuple[int, int], DailyPick]] = {}
+            for r in results:
+                if r.skipped or not r.ok or not r.items:
+                    continue
+                first = r.items[0]
+                score = _weighted_score(first.stars, first.views)
+                pick = DailyPick(
+                    section=r.section,
+                    source_id=r.source_id,
+                    title=first.title,
+                    url=first.url,
+                    stars=first.stars,
+                    views=first.views,
+                )
+                current = by_section.get(r.section)
+                if current is None or score > current[0]:
+                    by_section[r.section] = (score, pick)
+
+            for sec in [s.key for s in SECTIONS]:
+                if sec in by_section:
+                    daily_picks.append(by_section[sec][1])
+
         report = {
             "generated_at": datetime.now().isoformat(timespec="seconds"),
             "args": vars(args),
@@ -398,6 +480,7 @@ async def amain() -> int:
                 "failed": sum(1 for r in results if not r.ok),
             },
             "results": [asdict(r) for r in results],
+            "daily": [asdict(x) for x in daily_picks],
         }
 
         (out_dir / "report.json").write_text(

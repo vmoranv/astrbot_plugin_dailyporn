@@ -156,6 +156,14 @@ class HanimeSource(BaseSource):
         if m:
             return parse_compact_int(m.group(1))
 
+        m = re.search(
+            r"thumb_up</i>[\s\S]{0,160}?\((\d[\d,]*)\)",
+            detail_html,
+            re.IGNORECASE,
+        )
+        if m:
+            return parse_compact_int(m.group(1))
+
         m = re.search(r"thumb_up</i>\s*(\d{1,3})%", detail_html, re.IGNORECASE)
         if m:
             try:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import random
 import re
 from urllib.parse import urljoin
 
@@ -18,10 +19,13 @@ class NoodleMagazineSource(BaseSource):
     sections = {"real"}
 
     _ROOT_URL = "https://noodlemagazine.com"
-    # Homepage popular is now JS-driven; use server-rendered search page which contains watch cards.
-    _HOT_URL = f"{_ROOT_URL}/video/porn"
+    # Daily popular list (server-rendered with view ordering).
+    _HOT_URL = f"{_ROOT_URL}/popular/day?sort_by=views&sort_order=desc&p=0"
 
     _RE_DURATION = re.compile(r"(\d{1,2}:\d{2}(?::\d{2})?)")
+    _RE_VIEWS_TEXT = re.compile(r"(?i)\b(\d[\d,.]*[KMB]?)\s*views?\b")
+    _RE_LIKE_BLOCK = re.compile(r"(?is)\b(\d[\d,.]*[KMB]?)\b\s*(?:likes?|like)\b")
+    _RE_DISLIKE_BLOCK = re.compile(r"(?is)\b(\d[\d,.]*[KMB]?)\b\s*(?:dislikes?|dislike)\b")
 
     def __init__(self, http: HttpService):
         self._http = http
@@ -69,7 +73,50 @@ class NoodleMagazineSource(BaseSource):
                 m = self._RE_DURATION.search(time_el.get_text(" ", strip=True))
                 duration = (m.group(1) if m else "").strip()
 
-            meta = {"duration": duration} if duration else {}
+            likes = None
+            dislikes = None
+
+            # Detail page contains like/dislike counters.
+            try:
+                detail = await self._http.get_text(full_url, proxy=proxy)
+            except Exception:
+                detail = ""
+
+            if detail:
+                detail_soup = BeautifulSoup(detail, "html.parser")
+                views_el = detail_soup.select_one(".h_info .meta span")
+                if views_el:
+                    views = parse_compact_int(views_el.get_text(" ", strip=True))
+
+                likes_el = detail_soup.select_one(".h_info .actions a.like span")
+                if likes_el:
+                    likes = parse_compact_int(likes_el.get_text(" ", strip=True))
+
+                dislikes_el = detail_soup.select_one(
+                    ".h_info .actions a.dislike span"
+                )
+                if dislikes_el:
+                    dislikes = parse_compact_int(dislikes_el.get_text(" ", strip=True))
+
+                t = " ".join(detail_soup.get_text(" ").split())
+                if likes is None:
+                    likes = parse_compact_int(
+                        self._extract_first(t, [self._RE_LIKE_BLOCK])
+                    )
+                if dislikes is None:
+                    dislikes = parse_compact_int(
+                        self._extract_first(t, [self._RE_DISLIKE_BLOCK])
+                    )
+                if views is None:
+                    views = parse_compact_int(
+                        self._extract_first(t, [self._RE_VIEWS_TEXT])
+                    )
+
+            meta: dict[str, object] = {}
+            if duration:
+                meta["duration"] = duration
+            if dislikes is not None:
+                meta["dislikes"] = dislikes
 
             items.append(
                 HotItem(
@@ -78,12 +125,26 @@ class NoodleMagazineSource(BaseSource):
                     title=title,
                     url=full_url,
                     cover_url=cover,
-                    stars=None,
+                    stars=likes,
                     views=views,
                     meta=meta,
                 )
             )
-            if len(items) >= limit:
+            if len(items) >= max(limit * 6, limit):
                 break
 
+        if not items:
+            return items
+
+        if len(items) > limit:
+            items = random.sample(items, k=limit)
+
         return items
+
+    @staticmethod
+    def _extract_first(content: str, patterns: list[re.Pattern[str]]) -> str | None:
+        for p in patterns:
+            m = p.search(content or "")
+            if m:
+                return (m.group(1) or "").strip()
+        return None

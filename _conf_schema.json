@@ -101,12 +101,12 @@
       "enable_hqporner": {
         "description": "HQPorner",
         "type": "bool",
-        "default": true
+        "default": false
       },
       "enable_missav": {
         "description": "MissAV",
         "type": "bool",
-        "default": true
+        "default": false
       },
       "enable_mmdhub": {
         "description": "MMDHub",
@@ -135,11 +135,6 @@
       },
       "enable_sexcom": {
         "description": "Sex.com",
-        "type": "bool",
-        "default": true
-      },
-      "enable_smutba": {
-        "description": "Smutba",
         "type": "bool",
         "default": true
       },

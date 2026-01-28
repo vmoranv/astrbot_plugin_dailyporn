@@ -22,6 +22,7 @@ class SexComSource(BaseSource):
 
     _RE_DURATION = re.compile(r"(\d{1,2}:\d{2}(?::\d{2})?)")
     _RE_RATING = re.compile(r"(\d{1,3})%")
+    _RE_LT_NUMBER = re.compile(r"^<\s*(\d[\d,.]*)([KMB]?)$", re.IGNORECASE)
 
     def __init__(self, http: HttpService):
         self._http = http
@@ -91,9 +92,27 @@ class SexComSource(BaseSource):
                     break
 
             if views_token:
-                views = parse_compact_int(views_token.lstrip("<>").strip())
+                t = views_token.strip()
+                mlt = self._RE_LT_NUMBER.match(t)
+                if mlt:
+                    # Sex.com sometimes shows a non-exact counter like "<1K".
+                    # Use a conservative integer just below the threshold and
+                    # keep the raw text in meta for transparency.
+                    approx = parse_compact_int((mlt.group(1) or "").strip() + (mlt.group(2) or ""))
+                    if approx is not None and approx > 0:
+                        views = approx - 1
+                    else:
+                        views = None
+                else:
+                    views = parse_compact_int(t.lstrip("<>").strip())
 
-            meta = {"duration": duration} if duration else {}
+            meta: dict[str, object] = {}
+            if duration:
+                meta["duration"] = duration
+            if stars is not None:
+                meta["rating_percent"] = stars
+            if views_token:
+                meta["views_text"] = views_token
 
             items.append(
                 HotItem(

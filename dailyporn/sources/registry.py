@@ -18,7 +18,6 @@ from .pornhub import PornhubSource
 from .porntrex import PornTrexSource
 from .sexcom import SexComSource
 from .rule34video import Rule34VideoSource
-from .smutba import SmutbaSource
 from .spankbang import SpankBangSource
 from .three_d_porndude import ThreeDPornDudeSource
 from .three_dporn import ThreeDPornSource
@@ -40,6 +39,8 @@ class SourceInfo:
 
 
 class SourceRegistry:
+    MANUAL_ONLY_SOURCE_IDS = {"hqporner", "missav"}
+
     def __init__(self, http: HttpService, cfg: DailyPornConfig):
         self._http = http
         self._cfg = cfg
@@ -57,7 +58,6 @@ class SourceRegistry:
             "sexcom": SexComSource(http),
             "hentaigem": HentaiGemSource(http),
             "rule34video": Rule34VideoSource(http),
-            "smutba": SmutbaSource(http),
             "spankbang": SpankBangSource(http),
             "noodlemagazine": NoodleMagazineSource(http),
             "91vip": Vip91Source(http),
@@ -85,6 +85,8 @@ class SourceRegistry:
     def iter_enabled_sources(self, section: str) -> Iterable[BaseSource]:
         for sid, src in self._sources.items():
             if not src.supports(section):
+                continue
+            if sid in self.MANUAL_ONLY_SOURCE_IDS:
                 continue
             if not self._cfg.is_source_enabled(sid):
                 continue
