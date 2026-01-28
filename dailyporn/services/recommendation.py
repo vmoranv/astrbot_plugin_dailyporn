@@ -50,6 +50,10 @@ class RecommendationService:
         for part in results:
             items.extend(part)
 
+        manual_only = getattr(self._sources, "MANUAL_ONLY_SOURCE_IDS", set())
+        if manual_only:
+            items = [it for it in items if it.source not in manual_only]
+
         self._cache[cache_key] = CachedValue(
             expires_at=now + 600, value=items
         )  # 10 min
