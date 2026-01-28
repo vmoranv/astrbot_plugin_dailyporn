@@ -151,7 +151,7 @@
       "enable_xhamster": {
         "description": "xHamster",
         "type": "bool",
-        "default": true
+        "default": false
       },
       "enable_xnxx": {
         "description": "XNXX",
