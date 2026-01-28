@@ -59,6 +59,12 @@ class ReportService:
             logger.exception("[dailyporn] report failed")
 
     async def _send_daily(self, session: str, recos: dict, *, reason: str) -> None:
+        if recos:
+            summary = ", ".join(
+                f"{section_display(k)}:{v.source}(score={v.score_tuple()[0]} stars={v.stars or 0} views={v.views or 0})"
+                for k, v in recos.items()
+            )
+            logger.info(f"[dailyporn] render picks: {summary}")
         if self._cfg.delivery_mode == "html_image" and self._renderer is not None:
             image_path = await self._renderer.render_daily(recos, reason=reason)
             if image_path:

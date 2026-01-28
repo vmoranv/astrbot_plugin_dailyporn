@@ -8,6 +8,7 @@
 - `/dailyporn off`：在当前群聊关闭日报
 - `/dailyporn test`：手动触发一次日报（仅当前群聊）
 - `/dailyporn <分区>`：返回对应分区不同源最热门的封面 + 信息（分区：3D / 2.5D / 真人）
+- `/dailyporn hqporner|missav`：手动触发该源热榜（不参与日报排名）
 
 ## 配置
 

@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.1.3 (2026-01-28)
+
+- 调整：排行榜改为 views*0.7 + star*0.3 加权
+- 调整：HQPorner/MissAV 仅支持手动触发，日报与测试默认排除
+- 调整：XVideos/XHamster/XNXX/Porntrex/NoodleMagazine/HentaiGem/Rule34Video 采用指定日榜/筛选逻辑并随机取样
+- 修复：3DPorn/EPorner/Rule34Video/NoodleMagazine/XVideos/XXXPorn 等详情页统计解析
+- 增强：日报渲染前输出最终推荐日志，便于排查渲染失败
+- 文档：补充手动触发命令说明
+
 ## v0.1.2 (2026-01-28)
 
 - 移除：Smutba 信息源（非视频站点，不符合“视频日报”定位）

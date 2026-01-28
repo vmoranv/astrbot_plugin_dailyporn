@@ -41,6 +41,10 @@ class XVideosSource(BaseSource):
     _RE_DETAIL_DISLIKES = re.compile(
         r'class=["\']rating-bad-nbr["\'][^>]*>([^<]+)<', re.IGNORECASE
     )
+    _RE_DETAIL_VOTES_TOTAL = re.compile(
+        r'class=["\']rating-total-txt["\'][^>]*>([^<]+)<', re.IGNORECASE
+    )
+    _RE_DETAIL_RATING_PERCENT = re.compile(r"(\d{1,3}(?:\.\d+)?)%")
 
     def __init__(self, http: HttpService):
         self._http = http
@@ -140,6 +144,8 @@ class XVideosSource(BaseSource):
 
         views = None
         for sel in (
+            "#v-views strong.mobile-hide",
+            "#v-views strong",
             "#video-views strong",
             ".video-views strong",
             ".video-views .mobile-hide",
@@ -157,12 +163,29 @@ class XVideosSource(BaseSource):
 
         likes = None
         dislikes = None
+        rating_percent = None
+        total_votes = None
         el = soup.select_one(".rating-good-nbr")
         if el:
             likes = parse_compact_int(el.get_text(" ", strip=True))
         el = soup.select_one(".rating-bad-nbr")
         if el:
             dislikes = parse_compact_int(el.get_text(" ", strip=True))
+
+        perc_el = soup.select_one(".rate-infos .rating-good-perc")
+        if perc_el:
+            rating_percent = parse_compact_int(
+                perc_el.get_text(" ", strip=True).replace("%", "")
+            )
+
+        total_el = soup.select_one(".rate-infos .rating-total-txt")
+        if total_el:
+            raw = re.sub(
+                r"[^0-9.,KMBkmb]",
+                "",
+                total_el.get_text(" ", strip=True),
+            )
+            total_votes = parse_compact_int(raw)
 
         if likes is None:
             likes = parse_compact_int(
@@ -172,10 +195,26 @@ class XVideosSource(BaseSource):
             dislikes = parse_compact_int(
                 self._extract_first(html, [self._RE_DETAIL_DISLIKES])
             )
+        if rating_percent is None:
+            rating_percent = parse_compact_int(
+                self._extract_first(html, [self._RE_DETAIL_RATING_PERCENT])
+            )
+        if total_votes is None:
+            raw = self._extract_first(html, [self._RE_DETAIL_VOTES_TOTAL])
+            if raw:
+                raw = re.sub(r"[^0-9.,KMBkmb]", "", raw)
+                total_votes = parse_compact_int(raw)
+
+        if likes is None and rating_percent is not None and total_votes is not None:
+            likes = int(round(total_votes * (rating_percent / 100.0)))
+        if dislikes is None and total_votes is not None and likes is not None:
+            dislikes = max(0, total_votes - likes)
 
         meta: dict[str, object] = {}
         if dislikes is not None:
             meta["dislikes"] = dislikes
+        if rating_percent is not None:
+            meta["rating_percent"] = rating_percent
 
         return likes, views, meta
 
