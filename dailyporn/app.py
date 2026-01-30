@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any, Awaitable, Callable, Optional
 
 from astrbot.api.star import Context
+from astrbot.core.utils.astrbot_path import get_astrbot_data_path
 
 from .bus import EventBus
 from .config import DailyPornConfig
@@ -38,11 +39,19 @@ class DailyPornApp:
         self.images = ImageService(
             plugin_name=plugin_name, cfg=self.cfg, http=self.http
         )
+        render_dir = (
+            Path(get_astrbot_data_path())
+            / "plugin_data"
+            / plugin_name
+            / "cache"
+            / "renders"
+        )
         self.renderer = RenderService(
             cfg=self.cfg,
             images=self.images,
             html_render=html_render,
             templates_dir=Path(__file__).resolve().parents[1] / "templates",
+            render_dir=render_dir,
         )
         self.report = ReportService(
             context=context,

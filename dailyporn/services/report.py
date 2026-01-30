@@ -85,6 +85,12 @@ class ReportService:
                 except Exception as e:
                     logger.warning(f"[dailyporn] send daily image failed: {e}")
 
+        if reason == "schedule" and self._cfg.delivery_mode == "html_image":
+            logger.info(
+                "[dailyporn] schedule report skipped (render unavailable, logged only)"
+            )
+            return
+
         header = f"DailyPorn 日报 ({datetime.now().strftime('%Y-%m-%d %H:%M')}) 触发: {reason}"
         try:
             await self._context.send_message(session, MessageChain().message(header))
