@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.1.11 (2026-01-30)
+
+- 新增：渲染后端配置 `render_backend`（remote/local），支持本机 PIL 渲染模板
+
 ## v0.1.10 (2026-01-28)
 
 - 修复：封面缓存目录路径拼接，兼容 get_astrbot_data_path 返回 str/Path

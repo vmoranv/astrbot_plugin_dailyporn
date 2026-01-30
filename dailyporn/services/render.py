@@ -163,8 +163,9 @@ class RenderService:
 
     async def _render(self, ctx: dict[str, Any]) -> str | None:
         try:
+            backend = (self._cfg.render_backend or "remote").strip().lower()
             send_mode = (self._cfg.render_send_mode or "url").strip().lower()
-            if self._html_render:
+            if backend != "local" and self._html_render:
                 template_str = self._select_template()
                 try:
                     result = await self._html_render(

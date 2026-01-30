@@ -25,6 +25,13 @@
     "options": ["html_image", "plain"],
     "hint": "html_image=使用 HTML 模板渲染图片发送；plain=纯文本/图片链路（渲染失败时也会自动回退）"
   },
+  "render_backend": {
+    "type": "string",
+    "description": "渲染后端",
+    "default": "remote",
+    "options": ["remote", "local"],
+    "hint": "remote=调用渲染接口（失败时自动回退本地）；local=本机 PIL 渲染模板"
+  },
   "render_template_name": {
     "type": "string",
     "description": "渲染模板",

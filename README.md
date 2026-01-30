@@ -18,6 +18,7 @@
 - `mosaic_level`：封面打码程度
 - `proxy`：代理地址
 - `delivery_mode`：发送方式（`html_image`/`plain`）
+- `render_backend`：渲染后端（`remote`/`local`）
 - `render_template_name`：HTML 渲染模板
 - `render_send_mode`：渲染图片发送方式（`file`/`url`/`base64`）
 - `sources.*`：是否启用指定源（bool）

@@ -10,6 +10,7 @@ class DailyPornConfig:
     mosaic_level: int
     proxy: str
     delivery_mode: str
+    render_backend: str
     render_template_name: str
     render_send_mode: str
     render_image_type: str
@@ -35,6 +36,12 @@ class DailyPornConfig:
         )
         if delivery_mode not in {"html_image", "plain"}:
             delivery_mode = "html_image"
+
+        render_backend = (
+            str(raw.get("render_backend", "remote") or "remote").strip().lower()
+        )
+        if render_backend not in {"remote", "local"}:
+            render_backend = "remote"
 
         render_template_name = str(
             raw.get("render_template_name", "pornhub") or "pornhub"
@@ -82,6 +89,7 @@ class DailyPornConfig:
             render_full_page=render_full_page,
             render_omit_background=render_omit_background,
             render_timeout_ms=render_timeout_ms,
+            render_backend=render_backend,
             sources=sources,
         )
 
