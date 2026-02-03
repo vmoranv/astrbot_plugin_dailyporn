@@ -3,4 +3,4 @@ display_name: DailyPorn 日报推荐
 desc: 每日簧片热榜。
 version: v0.1.12
 author: vmoranv
-repo: ""
+repo: https://github.com/vmoranv/astrbot_plugin_dailyporn
