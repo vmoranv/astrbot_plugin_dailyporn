@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.1.12 (2026-02-03)
+
+- 修复：3dporndude 改用 most-popular 今日榜并从列表随机取样，避免推荐重复
+
 ## v0.1.11 (2026-01-30)
 
 - 新增：渲染后端配置 `render_backend`（remote/local），支持本机 PIL 渲染模板

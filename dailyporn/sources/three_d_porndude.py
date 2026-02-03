@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import random
 import re
+from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
 
@@ -28,6 +30,9 @@ class ThreeDPornDudeSource(BaseSource):
     }
 
     _HOT_URLS = [
+        # Fetch only the sorted block ("Today") to avoid extra page noise/ads and
+        # keep the selection stable.
+        f"{_ROOT_URL}/most-popular/?mode=async&function=get_block&block_id=list_videos_common_videos_list&sort_by=video_viewed_today",
         f"{_ROOT_URL}/most-popular/",
         f"{_ROOT_URL}/top-rated/",
         f"{_ROOT_URL}/",
@@ -45,7 +50,13 @@ class ThreeDPornDudeSource(BaseSource):
             return []
 
         list_html = await self._fetch_first(proxy)
-        items = self._parse_list(list_html, limit=limit, section=section)
+        # Per-source limit is often 1. If we always pick the first list item, users
+        # will see the same result repeatedly. Build a candidate pool, then sample.
+        limit = max(1, int(limit))
+        pool_limit = min(max(limit * 30, 60), 200)
+        items = self._parse_list(list_html, limit=pool_limit, section=section)
+        if len(items) > limit:
+            items = random.sample(items, k=limit)
 
         # This site shows rating% on list pages; detail pages contain real
         # like/dislike counts and a more accurate view counter. Prefer detail.
@@ -95,11 +106,20 @@ class ThreeDPornDudeSource(BaseSource):
         items: list[HotItem] = []
         seen: set[str] = set()
 
-        for card in soup.select("div.thumb-itm"):
-            a = card.select_one("a[href]")
-            href = (a.get("href") or "").strip() if a else ""
+        container = soup.select_one("#list_videos_common_videos_list_items") or soup
+
+        for card in container.select("div.thumb-itm"):
+            href = ""
+            a = None
+            for cand in card.select("a[href]"):
+                h = (cand.get("href") or "").strip()
+                if h and any(p.search(h) for p in self._LINK_PATTERNS):
+                    href = h
+                    a = cand
+                    break
             if not href or not any(p.search(href) for p in self._LINK_PATTERNS):
                 continue
+            href = urljoin(self._ROOT_URL, href)
             if href in seen:
                 continue
             seen.add(href)
