@@ -22,3 +22,12 @@
 - `render_template_name`：HTML 渲染模板
 - `render_send_mode`：渲染图片发送方式（`file`/`url`/`base64`）
 - `sources.*`：是否启用指定源（bool）
+
+## 常见问题
+
+### 中文渲染成方块/乱码
+
+如果使用 `render_backend=remote`（HTML 截图）时中文显示为方块，通常是「实际执行渲染的环境」缺少中文字体或字体回退没有命中。
+
+- 方案 1：改用 `render_backend=local`（PIL 本地渲染，不依赖浏览器字体回退）
+- 方案 2：在渲染环境里安装中文字体并刷新缓存（示例：`fonts-wqy-microhei` / `fonts-noto-cjk`，然后执行 `fc-cache -f`）
