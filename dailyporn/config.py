@@ -18,6 +18,8 @@ class DailyPornConfig:
     render_full_page: bool
     render_omit_background: bool
     render_timeout_ms: int
+    recommendation_cooldown_days: int
+    recommendation_initial_penalty_pct: int
     sources: Mapping[str, Any]
 
     @classmethod
@@ -71,6 +73,18 @@ class DailyPornConfig:
             render_timeout_ms = 20000
         render_timeout_ms = max(0, int(render_timeout_ms))
 
+        try:
+            cooldown_days = int(raw.get("recommendation_cooldown_days", 3))
+        except Exception:
+            cooldown_days = 3
+        recommendation_cooldown_days = max(0, min(365, cooldown_days))
+
+        try:
+            penalty_pct = int(raw.get("recommendation_initial_penalty_pct", 70))
+        except Exception:
+            penalty_pct = 70
+        recommendation_initial_penalty_pct = max(0, min(100, penalty_pct))
+
         sources = (
             raw.get("sources", {})
             if isinstance(raw.get("sources", {}), Mapping)
@@ -90,6 +104,8 @@ class DailyPornConfig:
             render_omit_background=render_omit_background,
             render_timeout_ms=render_timeout_ms,
             render_backend=render_backend,
+            recommendation_cooldown_days=recommendation_cooldown_days,
+            recommendation_initial_penalty_pct=recommendation_initial_penalty_pct,
             sources=sources,
         )
 

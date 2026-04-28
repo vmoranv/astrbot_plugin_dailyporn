@@ -73,6 +73,20 @@
     "description": "渲染超时（毫秒）",
     "default": 20000
   },
+  "recommendation_cooldown_days": {
+    "description": "推荐冷却天数",
+    "type": "int",
+    "hint": "仅影响日报推荐排序。同一源被选中后，惩罚在此天数内线性衰减至0。0=关闭冷却。",
+    "default": 3,
+    "slider": { "min": 0, "max": 30, "step": 1 }
+  },
+  "recommendation_initial_penalty_pct": {
+    "description": "初始惩罚百分比",
+    "type": "int",
+    "hint": "仅影响日报推荐排序。源被选中当日的惩罚力度（得分乘以 1-pct%）。0=关闭惩罚；100=当天按0分处理。",
+    "default": 70,
+    "slider": { "min": 0, "max": 100, "step": 5 }
+  },
   "sources": {
     "description": "信息源开关（bool）",
     "type": "object",

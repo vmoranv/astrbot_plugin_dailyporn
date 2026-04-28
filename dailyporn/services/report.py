@@ -45,13 +45,22 @@ class ReportService:
                 return
 
             sections = [s.key for s in SECTIONS]
-            recos = await self._reco.get_daily_recommendations(sections)
+            recos = await self._reco.get_daily_recommendations(
+                sections, now=event.requested_at, apply_penalty=True
+            )
+
             if recos:
+                should_record = event.reason in {"schedule", "manual"}
+                if should_record:
+                    await self._reco.record_daily_recommendations(
+                        recos, selected_at=event.requested_at
+                    )
+
                 summary = ", ".join(
                     f"{section_display(k)}:{v.source}({v.stars or 0}/{v.views or 0})"
                     for k, v in recos.items()
                 )
-                logger.info(f"[dailyporn] daily picks: {summary}")
+                logger.info(f"[dailyporn] daily picks ({event.reason}): {summary}")
 
             for session in targets:
                 await self._send_daily(session, recos, reason=event.reason)

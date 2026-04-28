@@ -9,6 +9,7 @@ from astrbot.core.utils.astrbot_path import get_astrbot_data_path
 from .bus import EventBus
 from .config import DailyPornConfig
 from .repositories.subscriptions import SubscriptionRepository
+from .repositories.recommendation_history import RecommendationHistoryRepository
 from .services.http import HttpService
 from .services.images import ImageService
 from .services.render import RenderService
@@ -35,7 +36,12 @@ class DailyPornApp:
 
         self.subscriptions = SubscriptionRepository(plugin_name=plugin_name)
         self.sources = SourceRegistry(self.http, self.cfg)
-        self.recommendations = RecommendationService(self.cfg, self.sources)
+        self.recommendation_history = RecommendationHistoryRepository(
+            plugin_name=plugin_name
+        )
+        self.recommendations = RecommendationService(
+            self.cfg, self.sources, history=self.recommendation_history
+        )
         self.images = ImageService(
             plugin_name=plugin_name, cfg=self.cfg, http=self.http
         )
