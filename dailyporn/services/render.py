@@ -165,31 +165,44 @@ class RenderService:
         try:
             backend = (self._cfg.render_backend or "remote").strip().lower()
             send_mode = (self._cfg.render_send_mode or "url").strip().lower()
+            used_remote = False
             if backend != "local" and self._html_render:
                 template_str = self._select_template()
-                try:
-                    result = await self._html_render(
-                        template_str,
-                        ctx,
-                        options=self._render_options(),
-                        return_url=send_mode == "url",
+                if not template_str:
+                    logger.warning(
+                        "[dailyporn] template unavailable; skip html_render and use local renderer"
                     )
-                    if send_mode == "url":
-                        if isinstance(result, str) and result.startswith(
-                            ("http://", "https://")
-                        ):
-                            return result
-                    out_path = Path(str(result)).resolve()
-                    out_path = await self._compress_render(out_path)
-                    if send_mode == "base64":
-                        data = await asyncio.to_thread(out_path.read_bytes)
-                        return base64.b64encode(data).decode("ascii")
-                    return str(out_path)
-                except Exception as e:
-                    logger.warning(f"[dailyporn] html_render failed: {e}")
+                else:
+                    used_remote = True
+                    try:
+                        result = await self._html_render(
+                            template_str,
+                            ctx,
+                            options=self._render_options(),
+                            return_url=send_mode == "url",
+                        )
+                        if send_mode == "url":
+                            if isinstance(result, str) and result.startswith(
+                                ("http://", "https://")
+                            ):
+                                return result
+                        out_path = Path(str(result)).resolve()
+                        out_path = await self._compress_render(out_path)
+                        if send_mode == "base64":
+                            data = await asyncio.to_thread(out_path.read_bytes)
+                            return base64.b64encode(data).decode("ascii")
+                        return str(out_path)
+                    except Exception as e:
+                        logger.warning(f"[dailyporn] html_render failed: {e}")
 
             local_path = await asyncio.to_thread(self._render_local, ctx)
             if local_path:
+                if backend == "local":
+                    logger.info("[dailyporn] rendered via local backend")
+                elif used_remote:
+                    logger.info("[dailyporn] remote render failed; fell back to local backend")
+                else:
+                    logger.info("[dailyporn] rendered via local backend (remote skipped)")
                 out_path = await self._compress_render(local_path)
                 if send_mode == "base64":
                     data = await asyncio.to_thread(out_path.read_bytes)

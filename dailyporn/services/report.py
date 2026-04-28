@@ -45,8 +45,12 @@ class ReportService:
                 return
 
             sections = [s.key for s in SECTIONS]
+            bypass_cache = event.reason == "manual"
             recos = await self._reco.get_daily_recommendations(
-                sections, now=event.requested_at, apply_penalty=True
+                sections,
+                now=event.requested_at,
+                apply_penalty=True,
+                bypass_cache=bypass_cache,
             )
 
             if recos:

@@ -49,7 +49,7 @@ class DailyPornPlugin(Star):
         if sub_lower == "test":
             yield event.plain_result("正在生成日报…")
             self.app.bus.publish(
-                DailyReportRequested(reason="preview", target_sessions=[session])
+                DailyReportRequested(reason="manual", target_sessions=[session])
             )
             return
 

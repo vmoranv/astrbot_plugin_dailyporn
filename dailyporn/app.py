@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Awaitable, Callable, Optional
 
+from astrbot.api import logger
 from astrbot.api.star import Context
 from astrbot.core.utils.astrbot_path import get_astrbot_data_path
 
@@ -71,6 +72,13 @@ class DailyPornApp:
         self.scheduler = SchedulerService(cfg=self.cfg, bus=self.bus)
 
     async def start(self) -> None:
+        logger.info(
+            "[dailyporn] render settings: "
+            f"delivery_mode={self.cfg.delivery_mode} "
+            f"backend={self.cfg.render_backend} "
+            f"send_mode={self.cfg.render_send_mode} "
+            f"template={self.cfg.render_template_name}"
+        )
         await self.http.start()
         self.report.register()
         self.scheduler.start()

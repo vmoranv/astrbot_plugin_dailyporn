@@ -33,13 +33,18 @@ class RecommendationService:
         self._cache: dict[str, CachedValue] = {}
 
     async def get_section_items(
-        self, section: str, *, per_source_limit: int = 1
+        self,
+        section: str,
+        *,
+        per_source_limit: int = 1,
+        bypass_cache: bool = False,
     ) -> list[HotItem]:
         cache_key = f"section:{section}:{per_source_limit}"
-        cached = self._cache.get(cache_key)
         now = time.time()
-        if cached and cached.expires_at > now:
-            return cached.value
+        if not bypass_cache:
+            cached = self._cache.get(cache_key)
+            if cached and cached.expires_at > now:
+                return cached.value
 
         proxy = self._cfg.proxy
         enabled_sources = list(self._sources.iter_enabled_sources(section))
@@ -62,9 +67,10 @@ class RecommendationService:
         if manual_only:
             items = [it for it in items if it.source not in manual_only]
 
-        self._cache[cache_key] = CachedValue(
-            expires_at=now + 600, value=items
-        )  # 10 min
+        if not bypass_cache:
+            self._cache[cache_key] = CachedValue(
+                expires_at=now + 600, value=items
+            )  # 10 min
         return items
 
     async def get_section_recommendation(
@@ -73,8 +79,11 @@ class RecommendationService:
         *,
         now: datetime | None = None,
         apply_penalty: bool = True,
+        bypass_cache: bool = False,
     ) -> Optional[HotItem]:
-        items = await self.get_section_items(section, per_source_limit=1)
+        items = await self.get_section_items(
+            section, per_source_limit=1, bypass_cache=bypass_cache
+        )
         if not items:
             return None
 
@@ -113,11 +122,15 @@ class RecommendationService:
         *,
         now: datetime | None = None,
         apply_penalty: bool = True,
+        bypass_cache: bool = False,
     ) -> dict[str, HotItem]:
         out: dict[str, HotItem] = {}
         for section in sections:
             item = await self.get_section_recommendation(
-                section, now=now, apply_penalty=apply_penalty
+                section,
+                now=now,
+                apply_penalty=apply_penalty,
+                bypass_cache=bypass_cache,
             )
             if item:
                 out[section] = item

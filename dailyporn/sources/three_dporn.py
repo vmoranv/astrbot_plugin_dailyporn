@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import random
 import re
 from urllib.parse import quote, urljoin
 
@@ -68,6 +69,7 @@ class ThreeDPornSource(BaseSource):
 
         items: list[HotItem] = []
         seen: set[str] = set()
+        candidates: list[dict[str, object]] = []
 
         # This site mixes non-video posts (e.g. game pages) in the same listing.
         # Only keep entries whose detail page looks like a video page.
@@ -96,6 +98,30 @@ class ThreeDPornSource(BaseSource):
             dur_el = a.find("span", class_="duration")
             if dur_el:
                 duration = (dur_el.get_text(strip=True) or "").strip()
+
+            candidates.append(
+                {
+                    "url": full_url,
+                    "cover_url": cover,
+                    "title": title,
+                    "stars": likes,
+                    "views": views,
+                    "duration": duration,
+                }
+            )
+
+        limit = max(1, int(limit))
+        pool_limit = min(max(limit * 30, 60), 200)
+        if len(candidates) > 1:
+            random.shuffle(candidates)
+
+        for cand in candidates[:pool_limit]:
+            full_url = str(cand["url"])
+            cover = str(cand["cover_url"] or "")
+            title = str(cand["title"] or full_url)
+            likes = cand["stars"]
+            views = cand["views"]
+            duration = str(cand["duration"] or "")
 
             try:
                 detail_html = await self._http.get_text(
